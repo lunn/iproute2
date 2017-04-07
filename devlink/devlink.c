@@ -1669,6 +1669,8 @@ static const char *port_type_name(uint32_t type)
 	case DEVLINK_PORT_TYPE_AUTO: return "auto";
 	case DEVLINK_PORT_TYPE_ETH: return "eth";
 	case DEVLINK_PORT_TYPE_IB: return "ib";
+	case DEVLINK_PORT_TYPE_CPU: return "cpu";
+	case DEVLINK_PORT_TYPE_INTER_SWITCH: return "inter-switch";
 	default: return "<unknown type>";
 	}
 }
@@ -3496,8 +3498,14 @@ dpipe_tables_action_values_show(struct dpipe_ctx *ctx,
 				struct nlattr *nla_action_values)
 {
 	struct nlattr *nla_action_value;
+	bool first = true;
 
 	mnl_attr_for_each_nested(nla_action_value, nla_action_values) {
+		if (first) {
+			pr_out_array_start(ctx->dl, "action_value");
+			first = false;
+		}
+		
 		if (dpipe_entry_action_value_show(ctx, nla_action_value))
 			return -EINVAL;
 	}
@@ -3509,8 +3517,14 @@ dpipe_tables_match_values_show(struct dpipe_ctx *ctx,
 			       struct nlattr *nla_match_values)
 {
 	struct nlattr *nla_match_value;
-
+	bool first = true;
+	
 	mnl_attr_for_each_nested(nla_match_value, nla_match_values) {
+		if (first) {
+			pr_out_array_start(ctx->dl, "match_value");
+			first = false;
+		}
+		
 		if (dpipe_entry_match_value_show(ctx, nla_match_value))
 			return -EINVAL;
 	}
@@ -3542,13 +3556,11 @@ static int dpipe_entry_show(struct dpipe_ctx *ctx, struct nlattr *nl)
 		pr_out_uint(ctx->dl, "counter", counter);
 	}
 
-	pr_out_array_start(ctx->dl, "match_value");
 	if (dpipe_tables_match_values_show(ctx,
 					   nla_entry[DEVLINK_ATTR_DPIPE_ENTRY_MATCH_VALUES]))
 		goto err_match_values_show;
 	pr_out_array_end(ctx->dl);
 
-	pr_out_array_start(ctx->dl, "action_value");
 	if (dpipe_tables_action_values_show(ctx,
 					    nla_entry[DEVLINK_ATTR_DPIPE_ENTRY_ACTION_VALUES]))
 		goto err_action_values_show;
