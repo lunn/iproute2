@@ -9,8 +9,8 @@
  * (at your option) any later version.
  */
 
-#ifndef _LINUX_DEVLINK_H_
-#define _LINUX_DEVLINK_H_
+#ifndef _UAPI_LINUX_DEVLINK_H_
+#define _UAPI_LINUX_DEVLINK_H_
 
 #define DEVLINK_GENL_NAME "devlink"
 #define DEVLINK_GENL_VERSION 0x1
@@ -80,6 +80,8 @@ enum devlink_port_type {
 	DEVLINK_PORT_TYPE_AUTO,
 	DEVLINK_PORT_TYPE_ETH,
 	DEVLINK_PORT_TYPE_IB,
+	DEVLINK_PORT_TYPE_CPU,
+	DEVLINK_PORT_TYPE_INTER_SWITCH,
 };
 
 enum devlink_sb_pool_type {
@@ -219,4 +221,4 @@ enum devlink_dpipe_action_type {
 	DEVLINK_DPIPE_ACTION_TYPE_FIELD_MODIFY,
 };
 
-#endif /* _LINUX_DEVLINK_H_ */
+#endif /* _UAPI_LINUX_DEVLINK_H_ */
