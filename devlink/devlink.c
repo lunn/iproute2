@@ -3334,6 +3334,8 @@ static const char *port_flavour_name(uint16_t flavour)
 		return "pcivf";
 	case DEVLINK_PORT_FLAVOUR_VIRTUAL:
 		return "virtual";
+	case DEVLINK_PORT_FLAVOUR_UNUSED:
+		return "unused";
 	default:
 		return "<unknown flavour>";
 	}
