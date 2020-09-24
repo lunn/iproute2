@@ -61,6 +61,8 @@
 #define HEALTH_REPORTER_STATE_ERROR_STR "error"
 #define HEALTH_REPORTER_TIMESTAMP_FMT_LEN 80
 
+#define ROUGE_PORT_INDEX ~0
+
 static int g_new_line_count;
 static int g_indent_level;
 static bool g_indent_newline;
@@ -1068,16 +1070,37 @@ static int dl_argv_handle_both(struct dl *dl, char **p_bus_name,
 }
 
 static int __dl_argv_handle_region(char *str, char **p_bus_name,
-				   char **p_dev_name, char **p_region)
+				   char **p_dev_name, uint32_t *p_port_index,
+				   char **p_region)
 {
+	unsigned int slash_count;
 	char *handlestr;
+	char *portstr;
 	int err;
+
+	slash_count = strslashcount(str);
+	*p_port_index = ROUGE_PORT_INDEX;
 
 	err = strslashrsplit(str, &handlestr, p_region);
 	if (err) {
 		pr_err("Region identification \"%s\" is invalid\n", str);
 		return err;
 	}
+
+	if (slash_count == 3) {
+		err = strslashrsplit(handlestr, &handlestr, &portstr);
+		if (err) {
+			pr_err("Port identification \"%s\" is invalid\n", str);
+			return err;
+		}
+		err = strtouint32_t(portstr, p_port_index);
+		if (err) {
+			pr_err("Port index \"%s\" is not a number or not within range\n",
+			       portstr);
+			return err;
+		}
+	}
+
 	err = strslashrsplit(handlestr, p_bus_name, p_dev_name);
 	if (err) {
 		pr_err("Region identification \"%s\" is invalid\n", str);
@@ -1087,7 +1110,8 @@ static int __dl_argv_handle_region(char *str, char **p_bus_name,
 }
 
 static int dl_argv_handle_region(struct dl *dl, char **p_bus_name,
-					char **p_dev_name, char **p_region)
+				 char **p_dev_name, uint32_t *p_port_index,
+				 char **p_region)
 {
 	char *str = dl_argv_next(dl);
 	unsigned int slash_count;
@@ -1098,13 +1122,14 @@ static int dl_argv_handle_region(struct dl *dl, char **p_bus_name,
 	}
 
 	slash_count = strslashcount(str);
-	if (slash_count != 2) {
+	if (slash_count != 2 && slash_count != 3) {
 		pr_err("Wrong region identification string format.\n");
-		pr_err("Expected \"bus_name/dev_name/region\" identification.\n"".\n");
+		pr_err("Expected \"bus_name/dev_name/region\" or \"bus_name/dev_name/port/region\" identification.\n"".\n");
 		return -EINVAL;
 	}
 
-	return __dl_argv_handle_region(str, p_bus_name, p_dev_name, p_region);
+	return __dl_argv_handle_region(str, p_bus_name, p_dev_name,
+				       p_port_index, p_region);
 }
 
 static int dl_argv_uint64_t(struct dl *dl, uint64_t *p_val)
@@ -1412,6 +1437,7 @@ static int dl_argv_parse(struct dl *dl, uint64_t o_required,
 	} else if (o_required & DL_OPT_HANDLE_REGION) {
 		err = dl_argv_handle_region(dl, &opts->bus_name,
 					    &opts->dev_name,
+					    &opts->port_index,
 					    &opts->region_name);
 		if (err)
 			return err;
@@ -1782,6 +1808,9 @@ static void dl_opts_put(struct nlmsghdr *nlh, struct dl *dl)
 	} else if (opts->present & DL_OPT_HANDLE_REGION) {
 		mnl_attr_put_strz(nlh, DEVLINK_ATTR_BUS_NAME, opts->bus_name);
 		mnl_attr_put_strz(nlh, DEVLINK_ATTR_DEV_NAME, opts->dev_name);
+		if (opts->port_index != ROUGE_PORT_INDEX)
+			mnl_attr_put_u32(nlh, DEVLINK_ATTR_PORT_INDEX,
+					 opts->port_index);
 		mnl_attr_put_strz(nlh, DEVLINK_ATTR_REGION_NAME,
 				  opts->region_name);
 	}
@@ -6455,9 +6484,17 @@ static void pr_out_region_handle_start(struct dl *dl, struct nlattr **tb)
 	const char *bus_name = mnl_attr_get_str(tb[DEVLINK_ATTR_BUS_NAME]);
 	const char *dev_name = mnl_attr_get_str(tb[DEVLINK_ATTR_DEV_NAME]);
 	const char *region_name = mnl_attr_get_str(tb[DEVLINK_ATTR_REGION_NAME]);
+	uint32_t port_index;
 	char buf[256];
 
-	sprintf(buf, "%s/%s/%s", bus_name, dev_name, region_name);
+	if (tb[DEVLINK_ATTR_PORT_INDEX]) {
+		port_index = mnl_attr_get_u32(tb[DEVLINK_ATTR_PORT_INDEX]);
+		sprintf(buf, "%s/%s/%d/%s", bus_name, dev_name,
+			port_index, region_name);
+	} else {
+		sprintf(buf, "%s/%s/%s", bus_name, dev_name, region_name);
+	}
+
 	if (dl->json_output)
 		open_json_object(buf);
 	else
